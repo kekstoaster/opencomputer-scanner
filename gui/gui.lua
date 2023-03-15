@@ -22,7 +22,7 @@ function loop(app)
     --print(scanner.)
 end
 
-local app = GuiApp:new({loop=loop})
+local app = GuiApp({loop=loop})
 app:set_state("config", config)
 app:set_state("scanner", scanner)
 
