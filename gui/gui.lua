@@ -1,5 +1,7 @@
 local event = require("event")
 local component = require("component")
+local shell = require("shell")
+
 local Scanner = require("src/scan/scanner")
 local ScreenScanIdle = require("src/screens/screen_scan_idle/index")
 local ScreenScanRunning = require("src/screens/screen_scan_running/index")
@@ -8,7 +10,7 @@ local border_box = require("gui/border_box")
 local GuiApp = require("gui/app")
 local FileMirror = require("gui/file_mirror")
 
-local config = FileMirror("./config")
+local config = FileMirror(shell.getWorkingDirectory() .. "/config")
 local geo = require("geo_config")
 local redstone = require("redstone_config")
 
