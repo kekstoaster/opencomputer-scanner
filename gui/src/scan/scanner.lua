@@ -5,88 +5,92 @@ local computer = require("computer")
 local os = require("os")
 
 local ah = require("src/scan/axis_helper")
+local class = require("class")
 
-local Scanner_meta = {}
-Scanner_meta["__index"] = Scanner_meta
-local Scanner = {}
+local Scanner, static = class()
 
 local exclude = "minecraft:air"
 
-function Scanner:new (base_config, geo_config, redstone_config)
-    local o = {}   -- create object if user does not provide one
-    o.base = base_config
-    o.geo = geo_config
-    o.redstone = redstone_config
-    o.scan_context = nil
-    o.runner = nil
+function Scanner:new(base_config, geo_config, redstone_config)
+    self.__base = base_config
+    self.__geo = geo_config
+    self.__redstone = redstone_config
+    self.__scan_context = nil
+    self.__runner = nil
 
-    o.block_scanner = component.proxy(geo_config.block.address)
-    o.scanner_side = geo_config.block.side
-    o.listeners = {}
+    self.__block_scanner = component.proxy(geo_config.block.address)
+    self.__scanner_side = geo_config.block.side
+    self.__listeners = {}
 
-    o.axis_grid_x = {}
-    o.axis_grid_y = {}
-    o.axis_grid_z = {}
+    self.__axis_grid_x = {}
+    self.__axis_grid_y = {}
+    self.__axis_grid_z = {}
 
-    for i = 1,base_config.model_size.max do
-        table.insert(o.axis_grid_x, ah.create_axis_x(geo_config, redstone_config, i))
-        table.insert(o.axis_grid_y, ah.create_axis_y(geo_config, redstone_config, i))
-        table.insert(o.axis_grid_z, ah.create_axis_z(geo_config, redstone_config, i))
+    for i = 1, base_config.model_size.max do
+        table.insert(self.__axis_grid_x, ah.create_axis_x(geo_config, redstone_config, i))
+        table.insert(self.__axis_grid_y, ah.create_axis_y(geo_config, redstone_config, i))
+        table.insert(self.__axis_grid_z, ah.create_axis_z(geo_config, redstone_config, i))
     end
-
-    setmetatable(o, Scanner_meta)
-    return o
 end
 
-function Scanner_meta:add_update_listener(update_cb)
-    table.insert(self.listeners, update_cb)
+function Scanner:add_update_listener(update_cb)
+    table.insert(self.__listeners, update_cb)
 end
 
-function Scanner_meta:start_scan(shape)
-    if self.scan_context == nil or not self.scan_context.running then
-        self.scan_context = {
-            running=true,
-            complete=false,
-            canceled=false,
-            x=1,
-            y=1,
-            z=1,
-            block=nil,
-            size=self.base.model_size.max,
-            shape=shape,
-            count=shape*shape*shape,
-            index=0,
-            start=computer.uptime(),
-            exclude=exclude
+function Scanner:start_scan(shape)
+    if self.__scan_context == nil or not self.__scan_context.running then
+        self.__scan_context = {
+            running = true,
+            complete = false,
+            canceled = false,
+            x = 1,
+            y = 1,
+            z = 1,
+            block = nil,
+            size = self.__base.model_size.max,
+            shape = shape,
+            count = shape * shape * shape,
+            index = 0,
+            start = computer.uptime(),
+            exclude = exclude
         }
-        self.runner = thread.create(Scanner_meta.Scanner_thread, self)
+        self.__runner = thread.create(Scanner.Scanner_thread, self)
         --self:Scanner_thread()
     end
 
-    return self.scan_context
+    return self.__scan_context
 end
 
-function Scanner_meta:Scanner_thread()
+local function reduce_block(block)
+    return {
+        name = block.name,
+        color = block.color,
+        metadata = block.metadata,
+        properties = block.properties
+    }
+end
+
+function Scanner:Scanner_thread()
     os.sleep()
     self:reset_axes()
-    local scan_context = self.scan_context
+    local scan_context = self.__scan_context
     scan_context.result = {}
     for z = 1 + (scan_context.size - scan_context.shape), scan_context.size do
         scan_context.z = z
         scan_context.result[z - (scan_context.size - scan_context.shape)] = {}
         os.sleep()
-        self.axis_grid_z[z]:swap()
+        self.__axis_grid_z[z]:swap()
         os.sleep()
-        for y = 1,scan_context.shape do
+        for y = 1, scan_context.shape do
             scan_context.y = y
             scan_context.result[z - (scan_context.size - scan_context.shape)][y] = {}
             os.sleep()
-            self.axis_grid_y[y]:swap()
+            self.__axis_grid_y[y]:swap()
             os.sleep()
-            for x = 1,scan_context.shape do
+            for x = 1, scan_context.shape do
                 scan_context.x = x
                 os.sleep()
-                self.axis_grid_x[x]:swap()
+                self.__axis_grid_x[x]:swap()
                 os.sleep()
 
                 scan_context.block = self:Scanner_read_block()
@@ -95,21 +99,21 @@ function Scanner_meta:Scanner_thread()
                 scan_context.index = scan_context.index + 1
 
                 os.sleep()
-                self.axis_grid_x[x]:swap()
+                self.__axis_grid_x[x]:swap()
                 os.sleep()
                 if not scan_context.running then
                     scan_context.canceled = true
                     break
                 end
 
-                for i, v in ipairs(self.listeners) do
+                for i, v in ipairs(self.__listeners) do
                     pcall(v, scan_context)
                     --v(scan_context)
                     os.sleep()
                 end
             end
             os.sleep()
-            self.axis_grid_y[y]:swap()
+            self.__axis_grid_y[y]:swap()
             os.sleep()
 
             if not scan_context.running then
@@ -118,7 +122,7 @@ function Scanner_meta:Scanner_thread()
             end
         end
         os.sleep()
-        self.axis_grid_z[z]:swap()
+        self.__axis_grid_z[z]:swap()
         os.sleep()
 
         if not scan_context.running then
@@ -134,19 +138,20 @@ function Scanner_meta:Scanner_thread()
     scan_context.running = false
 end
 
-function Scanner_meta:reset_axes()
-    local size = self.base.model_size.max
-    for i, v in ipairs(self.redstone) do
-        for s = 0,5 do
+function Scanner:reset_axes()
+    local size = self.__base.model_size.max
+    for _, addr in ipairs(self.__redstone.address) do
+        local proxy = component.proxy(addr)
+        for s = 0, 5 do
             os.sleep()
-            v.setOutput(s, 0)
+            proxy.setOutput(s, 0)
         end
         os.sleep()
     end
 
 
-    for i = 1,size do
-        local ax = self.axis_grid_x[i]
+    for i = 1, size do
+        local ax = self.__axis_grid_x[i]
         if not ax:is_start_position() then
             os.sleep()
             ax:swap()
@@ -155,8 +160,8 @@ function Scanner_meta:reset_axes()
         os.sleep()
     end
 
-    for i = 1,size do
-        local ax = self.axis_grid_y[i]
+    for i = 1, size do
+        local ax = self.__axis_grid_y[i]
         if not ax:is_start_position() then
             os.sleep()
             ax:swap()
@@ -165,8 +170,8 @@ function Scanner_meta:reset_axes()
         os.sleep()
     end
 
-    for i = 1,size do
-        local ax = self.axis_grid_z[i]
+    for i = 1, size do
+        local ax = self.__axis_grid_z[i]
         if not ax:is_start_position() then
             os.sleep()
             ax:swap()
@@ -176,19 +181,10 @@ function Scanner_meta:reset_axes()
     end
 end
 
-function reduce_block(block)
-    return {
-        name=block.name,
-        color=block.color,
-        metadata=block.metadata,
-        properties=block.properties
-    }
-end
-
-function Scanner_meta:Scanner_read_block()
-    local scan_context = self.scan_context
+function Scanner:Scanner_read_block()
+    local scan_context = self.__scan_context
     os.sleep()
-    local block = self.block_scanner.analyze(self.scanner_side)
+    local block = self.__block_scanner.analyze(self.__scanner_side)
     os.sleep()
 
     if (block.name ~= exclude) then
@@ -198,24 +194,24 @@ function Scanner_meta:Scanner_read_block()
     end
 end
 
-function Scanner_meta:cancel_scan()
-    self.scan_context.running = false
-    -- self.scan_context = nil
+function Scanner:cancel_scan()
+    self.__scan_context.running = false
+    -- self.__scan_context = nil
 end
 
-function Scanner_meta:is_ready()
+function Scanner:is_ready()
     return false
 end
 
-function Scanner_meta:is_running()
-    if self.scan_context then
-        return not self.scan_context.complete
+function Scanner:is_running()
+    if self.__scan_context then
+        return not self.__scan_context.complete
     end
     return false
 end
 
-function Scanner_meta:context()
-    return self.scan_context
+function Scanner:context()
+    return self.__scan_context
 end
 
-return Scanner
+return static

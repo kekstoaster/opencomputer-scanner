@@ -1,38 +1,35 @@
-local computer = require("computer")
-local thread = require("thread")
-local event = require("event")
-local os  = require("os")
+local computer                        = require("computer")
+local thread                          = require("thread")
+local event                           = require("event")
+local os                              = require("os")
 
-local Screen = require("gui/screenview")
-local header = require("gui/component/component_header")
-local button = require("gui/component/component_button")
-local label_row = require("gui/component/component_label_row")
-local horizontal_center = require("gui/component/component_horizontal_center")
-local progress_bar = require("gui/component/component_progress_bar")
+local class                           = require("class")
+local Screen                          = require("gui/screenview")
+local Header                          = require("gui/component/component_header")
+local Button                          = require("gui/component/component_button")
+local LabelRow                        = require("gui/component/component_label_row")
+local HorizontalCenter                = require("gui/component/component_horizontal_center")
+local ProgressBar                     = require("gui/component/component_progress_bar")
 
-local ScreenScanRunning = Screen.new()
-ScreenScanRunning["__index"] = ScreenScanRunning
+local ScreenScanRunning, static, base = class(Screen)
 
-function ScreenScanRunning:new (controller)
-    local o = {}
-    o.ctrl = controller
+function ScreenScanRunning:new(controller)
+    base.new(self)
 
-    setmetatable(o, ScreenScanRunning)
+    self.__ctrl = controller
 
-    --local gpu = o.gpu
+    self:add_component(Header { text = "3D Scanner - Scanvorgang", y = 4 })
 
-    o:addComponent(header:new{text="3D Scanner - Scanvorgang", y=4})
+    local text_x = LabelRow { text = "1" }
+    local text_y = LabelRow { text = "1" }
+    local text_z = LabelRow { text = "1" }
+    local text_current_block = LabelRow { text = "" }
+    local text_remaining_blocks = LabelRow { text = "" }
+    local text_remaining_time = LabelRow { text = "unbekannt" }
 
-    local text_x = label_row:new{text="1"}
-    local text_y = label_row:new{text="1"}
-    local text_z = label_row:new{text="1"}
-    local text_current_block = label_row:new{text=""}
-    local text_remaining_blocks = label_row:new{text=""}
-    local text_remaining_time = label_row:new{text="unbekannt"}
+    local scanner = controller:get_scanner()
 
-    local scanner = controller.app:get_state("scanner")
-
-    function format_time(seconds)
+    local function format_time(seconds)
         seconds = math.floor(seconds)
         local h = math.floor(seconds / 3600)
         local m = math.floor((seconds % 3600) / 60)
@@ -51,34 +48,34 @@ function ScreenScanRunning:new (controller)
         return str
     end
 
-    function cancel_fn()
+    local function cancel_fn()
         scanner:cancel_scan()
         event.push("screen", "setup", "setup", "setup")
     end
 
     local move = 50
 
-    o:addComponent(label_row:new{text="Z: ", x=move, y=14, align="right", padding=30, component=text_z, name="row"})
-    o:addComponent(label_row:new{text="Y: ", x=move, y=15, align="right", padding=30, component=text_y, name="row"})
-    o:addComponent(label_row:new{text="X: ", x=move, y=16, align="right", padding=30, component=text_x, name="row"})
+    self:add_component(LabelRow { text = "Z: ", x = move, y = 14, align = "right", padding = 30, component = text_z, name = "row" })
+    self:add_component(LabelRow { text = "Y: ", x = move, y = 15, align = "right", padding = 30, component = text_y, name = "row" })
+    self:add_component(LabelRow { text = "X: ", x = move, y = 16, align = "right", padding = 30, component = text_x, name = "row" })
 
 
-    o:addComponent(label_row:new{text="Block: ", x=move, y=18, align="right", padding=30, component=text_current_block, name="row"})
+    self:add_component(LabelRow { text = "Block: ", x = move, y = 18, align = "right", padding = 30, component = text_current_block, name = "row" })
 
-    o:addComponent(label_row:new{text="Verbleibend: ", x=move, y=20, align="right", padding=30, component=text_remaining_blocks, name="row"})
-    o:addComponent(label_row:new{text="Zeit: ", x=move, y=21, align="right", padding=30, component=text_remaining_time, name="row"})
-
-
-    local btn1 = button:new{text="Abbrechen", click=cancel_fn, padding=5, name="btn"}
-    local hc1 = horizontal_center:new{component=btn1, y=30}
-    local progress = progress_bar:new{width=51}
-    local hc2 = horizontal_center:new{component=progress, y=25}
-
-    o:addComponent(hc1)
-    o:addComponent(hc2)
+    self:add_component(LabelRow { text = "Verbleibend: ", x = move, y = 20, align = "right", padding = 30, component = text_remaining_blocks, name = "row" })
+    self:add_component(LabelRow { text = "Zeit: ", x = move, y = 21, align = "right", padding = 30, component = text_remaining_time, name = "row" })
 
 
-    local update = function(scan_context)
+    local btn1 = Button { text = "Abbrechen", click = cancel_fn, padding = 5, name = "btn" }
+    local hc1 = HorizontalCenter { component = btn1, y = 30 }
+    local progress = ProgressBar { width = 51 }
+    local hc2 = HorizontalCenter { component = progress, y = 25 }
+
+    self:add_component(hc1)
+    self:add_component(hc2)
+
+
+    local function update(scan_context)
         text_x:set_text(scan_context.x)
         text_y:set_text(scan_context.y)
         text_z:set_text(scan_context.z)
@@ -89,19 +86,19 @@ function ScreenScanRunning:new (controller)
         end
         text_remaining_blocks:set_text(scan_context.count - scan_context.index)
         if (scan_context.index > 3) then
-            local time_avg = scan_context.index / (computer.uptime() - scan_context.start)
-            text_remaining_time:set_text(format_time((scan_context.count - scan_context.index) * time_avg))
+            local seconds_per_block = (computer.uptime() - scan_context.start) / scan_context.index
+            text_remaining_time:set_text(format_time((scan_context.count - scan_context.index) * seconds_per_block))
         end
 
         progress:advance()
-        o.gpu:invalidate()
+        self:get_gpu():invalidate()
 
         if scan_context.count == scan_context.index then
             event.push("screen", "save", "save", "save")
         end
     end
 
-    function reset_fn()
+    local function reset_fn()
         text_x:set_text(1)
         text_y:set_text(1)
         text_z:set_text(1)
@@ -110,18 +107,16 @@ function ScreenScanRunning:new (controller)
         text_remaining_time:set_text("unbekannt")
 
         local context = scanner:context()
-        progress.max = context.count
+        progress:set_max(context.count)
         progress:reset()
     end
-    o.reset_fn = reset_fn
+    self.__reset_fn = reset_fn
 
     scanner:add_update_listener(update)
-
-    return o
 end
 
 function ScreenScanRunning:init()
-    self:reset_fn()
+    self.__reset_fn()
 end
 
-return ScreenScanRunning
+return static

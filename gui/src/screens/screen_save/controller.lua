@@ -1,18 +1,13 @@
-local ScreenSaveController = {}
-ScreenSaveController["__index"] = ScreenSaveController
+local class = require("class")
 
-function ScreenSaveController:new (app)
-    local o = {}
-    o.app = app
+local ScreenSaveController, static = class()
 
-
-
-    setmetatable(o, ScreenSaveController)
-    return o
+function ScreenSaveController:new(app)
+    self.__app = app
 end
 
 function ScreenSaveController:get_scanner()
-    return self.app:get_state("scanner")
+    return self.__app:get_state("scanner")
 end
 
-return ScreenSaveController
+return static

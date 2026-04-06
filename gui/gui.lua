@@ -15,20 +15,20 @@ local geo = require("geo_config")
 local redstone = require("redstone_config")
 
 -- component.gpu.setResolution(80, 30)
-local scanner = Scanner:new(config:dump(), geo, redstone)
+local scanner = Scanner(config:dump(), geo, redstone)
 
-function loop(app)
+local function loop(app)
     --print("loop")
     --print(scanner.)
 end
 
-local app = GuiApp({loop=loop})
+local app = GuiApp({ loop = loop })
 app:set_state("config", config)
 app:set_state("scanner", scanner)
 
-screenIdle = ScreenScanIdle(app)
-screenRunning = ScreenScanRunning(app)
-screenSave = ScreenSave(app)
+local screenIdle = ScreenScanIdle(app)
+local screenRunning = ScreenScanRunning(app)
+local screenSave = ScreenSave(app)
 
 app:add_screen("setup", screenIdle)
 app:add_screen("progress", screenRunning)
@@ -47,5 +47,5 @@ app:add_screen("save", screenSave)
 
 app:run()
 
-w, h = component.gpu.maxResolution()
+local w, h = component.gpu.maxResolution()
 component.gpu.setResolution(w, h)

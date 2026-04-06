@@ -1,18 +1,13 @@
-local ScreenScanRunningController = {}
-ScreenScanRunningController["__index"] = ScreenScanRunningController
+local class = require("class")
 
-function ScreenScanRunningController:new (app)
-    local o = {}
-    o.app = app
+local ScreenScanRunningController, static = class()
 
-
-
-    setmetatable(o, ScreenScanRunningController)
-    return o
+function ScreenScanRunningController:new(app)
+    self.__app = app
 end
 
-function ScreenScanRunningController:get_scanner(value)
-    return self.app:get_state("scanner")
+function ScreenScanRunningController:get_scanner()
+    return self.__app:get_state("scanner")
 end
 
-return ScreenScanRunningController
+return static
